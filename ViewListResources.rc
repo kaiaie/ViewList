@@ -1,0 +1,100 @@
+#include "resource.h"
+
+/* Version constants */
+#define VS_FFI_FILEFLAGSMASK 0x3F
+#define VOS__WINDOWS32 4
+#define VFT_APP 1
+#define VFT2_UNKNOWN 0
+
+
+/* Icons */
+0 ICON ViewList.ico
+
+
+/* String table */
+STRINGTABLE
+BEGIN
+	IDS_APP_TITLE              "ViewList 0.6"
+	IDS_APP_ABOUT_MSG          "ViewList \r\n © 2008-2016 Kaia Ltd. All rights reserved."
+	IDS_WARN_NOT_IMPLEMENTED   "This feature is not implemented yet."
+	IDS_ERROR_CREATING_WINDOW  "Error creating window"
+	IDS_ERROR_CREATING_PROCESS "Error creating process"
+	IDS_ERROR_FINDING_WINDOW   "Cannot find app window"
+	IDS_ERROR_OUT_OF_MEMORY    "Out of memory!"
+END
+
+
+/* Main Menu */
+IDM_MAIN MENU
+BEGIN
+	POPUP "&File"
+	BEGIN
+		MENUITEM "&Open\tCtrl+O",                  IDM_FILE_OPEN
+		MENUITEM "Open in &text editor\tCtrl+T",   IDM_FILE_OPENTEXT
+		MENUITEM "Open in &binary editor\tCtrl+B", IDM_FILE_OPENBINARY
+		MENUITEM "View &differences\tCtrl+D",      IDM_FILE_DIFF
+		MENUITEM SEPARATOR
+		MENUITEM "E&xit\tCtrl+W",                  IDM_FILE_EXIT
+	END
+	
+	POPUP "&Edit"
+	BEGIN
+		MENUITEM "&Copy\tCtrl+C",              IDM_EDIT_COPY
+		MENUITEM "Select &All\tCtrl+A",        IDM_EDIT_SELECTALL
+		MENUITEM SEPARATOR
+		MENUITEM "&Options...",                IDM_EDIT_OPTIONS
+	END
+	
+	POPUP "&Help"
+	BEGIN
+		MENUITEM "&About ViewList", IDM_HELP_ABOUT
+	END
+END
+
+
+/* Accelerator table */
+IDA_MAIN ACCELERATORS
+BEGIN
+	"^C",      IDM_EDIT_COPY
+	"^O",      IDM_FILE_OPEN
+	"^W",      IDM_FILE_EXIT
+	"^D",      IDM_FILE_DIFF
+	"^T",      IDM_FILE_OPENTEXT
+	"^B",      IDM_FILE_OPENBINARY
+
+	"^A",      IDM_EDIT_SELECTALL
+	13,        IDM_FILE_OPEN, VIRTKEY, NOINVERT
+END
+
+
+/* Dialog boxes */
+
+
+/* Version info */
+1 VERSIONINFO
+FILEVERSION    0,0,0,6
+PRODUCTVERSION 0,0,0,6
+FILEFLAGSMASK  VS_FFI_FILEFLAGSMASK
+FILEFLAGS      0
+FILEOS         0x40004 /* VOS_NT_WINDOWS32 */
+FILETYPE       VFT_APP
+FILESUBTYPE    VFT2_UNKNOWN
+BEGIN
+	BLOCK "StringFileInfo"
+	BEGIN
+		BLOCK "040904E4"
+		BEGIN
+			VALUE "CompanyName",      "Kaia Ltd.\r\nhttp://www.kaia.ie"
+			VALUE "FileDescription",  "ViewList"
+			VALUE "FileVersion",      "0.0.6"
+			VALUE "InternalName",     "ViewList"
+			VALUE "LegalCopyright",   "© 2008-2016 Kaia Ltd. All rights reserved"
+			VALUE "ProductName",      "ViewList"
+			VALUE "ProductVersion",   "0.0.6"
+		END
+	END
+	BLOCK "VarFileInfo"
+	BEGIN
+		VALUE "Translation", 0x409, 1252
+	END
+END
