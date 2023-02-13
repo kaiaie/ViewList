@@ -2,3 +2,4 @@
 *.d
 *.exe
 tags 
+doc/
