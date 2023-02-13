@@ -14,13 +14,15 @@
 /* String table */
 STRINGTABLE
 BEGIN
-	IDS_APP_TITLE              "ViewList 0.6"
-	IDS_APP_ABOUT_MSG          "ViewList \r\n © 2008-2016 Kaia Ltd. All rights reserved."
+	IDS_APP_TITLE              "ViewList 0.7"
+	IDS_APP_ABOUT_MSG          "ViewList \r\n © 2008-2023 Kaia Ltd. All rights reserved."
 	IDS_WARN_NOT_IMPLEMENTED   "This feature is not implemented yet."
 	IDS_ERROR_CREATING_WINDOW  "Error creating window"
 	IDS_ERROR_CREATING_PROCESS "Error creating process"
 	IDS_ERROR_FINDING_WINDOW   "Cannot find app window"
 	IDS_ERROR_OUT_OF_MEMORY    "Out of memory!"
+	IDS_ERROR_MODULES          "Error enumerating parent modules"
+	IDS_ERROR_PARENT           "Could not determine my parent process"
 END
 
 
@@ -86,11 +88,11 @@ BEGIN
 		BEGIN
 			VALUE "CompanyName",      "Kaia Ltd.\r\nhttp://www.kaia.ie"
 			VALUE "FileDescription",  "ViewList"
-			VALUE "FileVersion",      "0.0.6"
+			VALUE "FileVersion",      "0.0.7"
 			VALUE "InternalName",     "ViewList"
-			VALUE "LegalCopyright",   "© 2008-2016 Kaia Ltd. All rights reserved"
+			VALUE "LegalCopyright",   "© 2008-2023 Kaia Ltd. All rights reserved"
 			VALUE "ProductName",      "ViewList"
-			VALUE "ProductVersion",   "0.0.6"
+			VALUE "ProductVersion",   "0.0.7"
 		END
 	END
 	BLOCK "VarFileInfo"

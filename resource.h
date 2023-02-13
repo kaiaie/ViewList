@@ -9,6 +9,8 @@
 #define IDS_ERROR_CREATING_PROCESS 0x201
 #define IDS_ERROR_FINDING_WINDOW   0x202
 #define IDS_ERROR_OUT_OF_MEMORY    0x203
+#define IDS_ERROR_MODULES          0x204
+#define IDS_ERROR_PARENT           0x205
 
 /* Menu items */
 #define  IDM_MAIN                  0x300

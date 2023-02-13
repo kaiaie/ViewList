@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <windows.h>
+#include <psapi.h>
+#include <tlhelp32.h>
 #include "resource.h"
 #include "MainWindow.h"
 #include "Utils.h"
@@ -12,43 +14,46 @@
 #define BYTES_PER_READ      132
 
 
-static int SpawnGui(HINSTANCE hInstance, int nCmdShow);
-static int ReadAndCopyStandardInput(HINSTANCE hInstance, HANDLE hStdIn);
-static BOOL CreateGuiProcess(PROCESS_INFORMATION *pi);
+static BOOL IsTheSpawnedProcess(LPSTR lpszExePath);
+static int StartGui(HINSTANCE hInstance, int nCmdShow);
+static int ReadAndCopyStandardInput(HINSTANCE hInstance, HANDLE hStdIn, 
+	LPSTR lpszExePath, LPSTR lpszCmdLine);
+static BOOL CreateGuiProcess(PROCESS_INFORMATION *pi, LPSTR lpszExePath,
+	LPSTR lpszCmdLine);
+static DWORD GetParentProcessID();
 
 
-/** Callback function for EnumThreadWindows */
-BOOL CALLBACK GetListWindow(HWND hwnd, LPARAM lParam)
-{
-	*((HWND *)lParam) = hwnd;
-	/* The app only has one window so terminate the enumeration */
-	return FALSE;
-}
-
-
-/** Main function */
+/** \brief Application entry point */
 int WINAPI
 WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR lpszCmdLine, int nCmdShow)
 {
-	int                 returnValue          = 0;
-	HANDLE              hStdIn;
+	int     returnValue = 0;
+	HANDLE  hStdIn;
+	CHAR    szExeFilePath[MAX_PATH];
 	
 	hInstance = hInst;
 	
 	GetAppTitle();
 	
+	GetModuleFileName
+	(
+		(HMODULE)NULL, 
+		szExeFilePath, 
+		MAX_PATH
+	);
+	
 	/* If called from the command-line, we run a second copy of the executable.
-	** This instance gathers the input from stdin while the second instances 
-	** displays a window to the user.  This is so the list can be displayed 
-	** without blocking the command prompt
+	** This instance gathers the input from stdin while the second instance 
+	** displays a window to the user.  This is so the list can continue to be 
+	** displayed without blocking the command prompt
 	*/
-	if (strstr(lpszCmdLine, "/g") != NULL || strstr(lpszCmdLine, "/G") != NULL)
+	if (IsTheSpawnedProcess(szExeFilePath))
 	{
-		returnValue = SpawnGui(hInstance, nCmdShow);
+		returnValue = StartGui(hInstance, nCmdShow);
 	}
 	else if ((hStdIn = GetStdHandle(STD_INPUT_HANDLE)) != INVALID_HANDLE_VALUE)
 	{
-		returnValue = ReadAndCopyStandardInput(hInstance, hStdIn);
+		returnValue = ReadAndCopyStandardInput(hInstance, hStdIn, szExeFilePath, lpszCmdLine);
 	}
 	else
 	{
@@ -58,8 +63,9 @@ WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR lpszCmdLine, int nCmdShow)
 }
 
 
+/** \brief Event loop for GUI portion of app */
 static int
-SpawnGui(HINSTANCE hInstance, int nCmdShow)
+StartGui(HINSTANCE hInstance, int nCmdShow)
 {
 	HWND    hMainWindow = NULL;
 	HACCEL  acceleratorTable;
@@ -68,7 +74,6 @@ SpawnGui(HINSTANCE hInstance, int nCmdShow)
 	
 	if ((hMainWindow = CreateMainWindow(hInstance)) != NULL)
 	{
-			
 			/* Load accelerator table */
 			acceleratorTable = LoadAccelerators(hInstance, 
 				MAKEINTRESOURCE(IDA_MAIN)
@@ -93,11 +98,23 @@ SpawnGui(HINSTANCE hInstance, int nCmdShow)
 }
 
 
+/** \brief Callback function for EnumThreadWindows */
+BOOL CALLBACK GetListWindow(HWND hwnd, LPARAM lParam)
+{
+	*((HWND *)lParam) = hwnd;
+	/* The app only has one window so terminate the enumeration */
+	return FALSE;
+}
+
+
+/** \brief Starts another copy of the process to display the GUI, then post 
+*** whatever gets read from standard input to it
+*/
 static int
-ReadAndCopyStandardInput(HINSTANCE hInstance, HANDLE hStdIn)
+ReadAndCopyStandardInput(HINSTANCE hInstance, HANDLE hStdIn, LPSTR lpszExePath, LPSTR lpszCmdLine)
 {
 	PROCESS_INFORMATION pi;
-	HWND    hMainWindow = NULL;
+	HWND                hMainWindow = NULL;
 	LPSTR               lpBuffer;
 	COPYDATASTRUCT      *lpCopyStruct = NULL;
 	DWORD               dwBufferSize;
@@ -107,7 +124,7 @@ ReadAndCopyStandardInput(HINSTANCE hInstance, HANDLE hStdIn)
 	BOOL                bFileRead;
 	int                 returnValue = 1;
 	
-	if (CreateGuiProcess(&pi))
+	if (CreateGuiProcess(&pi, lpszExePath, lpszCmdLine))
 	{
 		/* Wait for process to stabilise */
 		WaitForInputIdle(pi.hProcess, INFINITE);
@@ -125,7 +142,8 @@ ReadAndCopyStandardInput(HINSTANCE hInstance, HANDLE hStdIn)
 			lpBuffer[0] = '\0';
 			for (;;)
 			{
-				bFileRead = ReadFile(
+				bFileRead = ReadFile
+				(
 					hStdIn,
 					(LPVOID) &lpBuffer[dwTotalBytesRead],
 					BYTES_PER_READ,
@@ -181,41 +199,133 @@ ReadAndCopyStandardInput(HINSTANCE hInstance, HANDLE hStdIn)
 
 
 static BOOL
-CreateGuiProcess(LPPROCESS_INFORMATION pi)
+CreateGuiProcess(LPPROCESS_INFORMATION pi, LPSTR lpszExePath, LPSTR lpszCmdLine)
 {
-	BOOL  returnValue = FALSE;
-	DWORD dwCmdLineSize = MAX_PATH * 2;
-	LPSTR lpCmdLine;
+	BOOL        returnValue = FALSE;
 	STARTUPINFO si;
 	
-	lpCmdLine = (LPSTR)malloc(dwCmdLineSize);
-	if (GetModuleFileName((HMODULE)NULL, lpCmdLine, MAX_PATH) != 0)
-	{
-		/* Start another instance of this app but with "/g" command-line switch */
-		lstrcat(lpCmdLine, " /g");
-
-		si.cb          =  sizeof(STARTUPINFO);
-		si.lpReserved  =  NULL;
-		si.lpDesktop   =  NULL;
-		si.lpTitle     =  NULL;
-		si.dwFlags     =  0L;
-		si.cbReserved2 =  0;
-		si.lpReserved2 =  NULL;
-		
-		returnValue = CreateProcess(
-			(LPCTSTR)NULL,
-			lpCmdLine,
-			(LPSECURITY_ATTRIBUTES)NULL,
-			(LPSECURITY_ATTRIBUTES)NULL,
-			FALSE,
-			NORMAL_PRIORITY_CLASS,
-			NULL,
-			NULL,
-			&si,
-			pi
-		);
-		
-		free(lpCmdLine);
-	}
+	si.cb          =  sizeof(STARTUPINFO);
+	si.lpReserved  =  NULL;
+	si.lpDesktop   =  NULL;
+	si.lpTitle     =  NULL;
+	si.dwFlags     =  0L;
+	si.cbReserved2 =  0;
+	si.lpReserved2 =  NULL;
+	
+	returnValue = CreateProcess
+	(
+		lpszExePath,
+		lpszCmdLine,
+		(LPSECURITY_ATTRIBUTES)NULL,
+		(LPSECURITY_ATTRIBUTES)NULL,
+		FALSE,
+		NORMAL_PRIORITY_CLASS,
+		NULL,
+		NULL,
+		&si,
+		pi
+	);
+	
 	return returnValue;
+}
+
+
+/** \brief Returns TRUE if this is the GUI process */
+static BOOL
+IsTheSpawnedProcess(LPSTR lpszExePath)
+{
+	BOOL bResult = FALSE;
+	DWORD pidParent;
+	BOOL bSuccess;
+	
+	pidParent = GetParentProcessID();
+	if (pidParent != 0)
+	{
+		HANDLE hParent = OpenProcess
+		(
+			SYNCHRONIZE | PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+            FALSE,
+			pidParent
+		);
+		if (hParent != INVALID_HANDLE_VALUE)
+		{
+			/* We only want the first module name */
+			HMODULE modules[1];
+			DWORD cbNeeded;
+			bSuccess = EnumProcessModules
+			(
+				hParent,
+				modules,
+				sizeof(HMODULE),
+				&cbNeeded
+			);
+			if (bSuccess)
+			{
+				CHAR szParentExeName[MAX_PATH];
+				bSuccess = GetModuleFileNameEx
+				(
+					hParent,
+					modules[0],
+					szParentExeName,
+					MAX_PATH
+				);
+				if (bSuccess)
+				{
+					bResult = CompareString
+					(
+						LOCALE_SYSTEM_DEFAULT,
+						NORM_IGNORECASE,
+						lpszExePath,
+						-1,
+						szParentExeName,
+						-1
+					) == CSTR_EQUAL;
+				}
+				else
+				{
+					DisplayErrorMessage((HWND)NULL, IDS_ERROR_MODULES);
+					ExitProcess(GetLastError());					
+				}
+			}
+			CloseHandle(hParent);
+		}
+	}
+	else
+	{
+		DisplayErrorMessage((HWND)NULL, IDS_ERROR_PARENT);
+		ExitProcess(GetLastError());
+	}
+	return bResult;
+}
+
+
+/** \brief Returns the parent PID of the current process
+*** \see https://www.codeproject.com/Articles/9893/Get-Parent-Process-PID
+**/
+static DWORD
+GetParentProcessID()
+{
+	DWORD pidMine = GetCurrentProcessId();
+	DWORD pidParent = (DWORD)0;
+	HANDLE hThSnapshot;
+
+	hThSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, pidMine);
+	if (hThSnapshot != INVALID_HANDLE_VALUE)
+	{
+		PROCESSENTRY32 peProcessEntry;
+		BOOL bMoreProcesses;
+		peProcessEntry.dwSize = sizeof(PROCESSENTRY32);
+		bMoreProcesses = Process32First(hThSnapshot, &peProcessEntry);
+		while (bMoreProcesses)
+		{
+			if (peProcessEntry.th32ProcessID == pidMine)
+			{
+				pidParent = peProcessEntry.th32ParentProcessID;
+				break;
+			}
+			bMoreProcesses = Process32Next(hThSnapshot, &peProcessEntry);
+		}
+		CloseHandle(hThSnapshot);
+	}
+	return pidParent;
 }
